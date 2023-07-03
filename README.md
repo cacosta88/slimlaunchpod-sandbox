@@ -1,3 +1,8 @@
+
+<div align="center">
+  <img src="./rocket2logo.png" width="200" alt="Made with stable diffusion">
+</div>
+
 # Overview - Slim Launchpod (sandbox repo)
 
 This contract is designed to manage payments and funding for a set of 'creators', using either Ethereum's native currency, Ether, or an ERC20 token. The central element of the contract is the notion of a 'creator flow', which is essentially a set of funding rules for each creator, allowing them to withdraw funds from the contract up to a specified limit during a specified cycle.
