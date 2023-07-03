@@ -5,7 +5,7 @@
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
 import { deployments, ethers } from "hardhat";
-import { YourContract,ERC20Mock1,ERC20Mock2} from "../../typechain-types";
+import { YourContract,ERC20Mock1} from "../../typechain-types";
 import { Address } from "hardhat-deploy/types";
 
 const chalk = require('chalk');
@@ -51,7 +51,7 @@ describe("Test file for YourContract.sol", () => {
 
    let contract: YourContract;
    let mock_1: ERC20Mock1;
-   let mock_2: ERC20Mock2;
+  
 
   beforeEach(async () => {
     const signers: SignerWithAddress[] = await ethers.getSigners();
@@ -84,12 +84,12 @@ describe("Test file for YourContract.sol", () => {
     user_25 = signers[25];
     user_26 = signers[26];    
 
-await deployments.fixture(["YourContract", "ERC20Mock1", "ERC20Mock2"]);
+await deployments.fixture(["YourContract", "ERC20Mock1"]);
 
 
 contract = await ethers.getContract("YourContract", admin);
 mock_1 = await ethers.getContract("ERC20Mock1");
-mock_2 = await ethers.getContract("ERC20Mock2");
+
 
 
   });
