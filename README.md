@@ -1,8 +1,6 @@
-# Overview
+# Overview - Slim Launchpod (sandbox repo)
 
 This contract is designed to manage payments and funding for a set of 'creators', using either Ethereum's native currency, Ether, or an ERC20 token. The central element of the contract is the notion of a 'creator flow', which is essentially a set of funding rules for each creator, allowing them to withdraw funds from the contract up to a specified limit during a specified cycle.
-
-This contract’s constructor function does the following: 
 
 The constructor function of this smart contract is used to initialize some important variables when the contract is deployed. Here's a breakdown of its purpose and functionality:
 
@@ -86,3 +84,35 @@ function availableCreatorAmount(
 
 Each 'creator flow' includes a 'cap' (the maximum amount of funds that can be withdrawn in a cycle) and a 'last' (the timestamp of the last withdrawal). The 'availableCreatorAmount' function first retrieves the creator flow for the given creator address, then calculates how much time has passed since the last withdrawal. If less time has passed than the length of a full cycle, the function calculates the amount the creator can withdraw proportionally. If a full cycle or more has passed, the creator can withdraw the full cap amount.
 
+# Deployment instructions
+
+deployment file: `slimlaunchpod-sandbox/packages/hardhat/deploy/01_deploy_your_contract.ts`
+
+In this contract deployment file, the `args` array represents the arguments that are passed to the contract's constructor during deployment. Here's a breakdown of what each argument represents in this specific case:
+
+```typescript
+args: [deployer,ZERO_ADDRESS,[],[]]
+```
+
+- `deployer` : This is the address of the account that deploys the contract. This address will be set as the primary admin and granted the `DEFAULT_ADMIN_ROLE` in the AccessControl contract.
+- `ZERO_ADDRESS` : This is a placeholder address representing the Ethereum zero address. If this is used as the `_tokenAddress` in the constructor, it means the contract is not in ERC20 mode (but in ETH mode) because the zero address indicates that no ERC20 token address has been provided.
+- `[]` : The first empty array is supposed to contain a list of creator addresses.
+- `[]` : The second empty array is supposed to contain the corresponding caps for each creator.
+
+Now, if you want to deploy the contract in ERC20 mode, you can pass the address of the ERC20 token as the second argument like so:
+
+```typescript
+args: [deployer,ERC20Mock1Address,[],[]]
+```
+
+`ERC20Mock1Address` is the address of the ERC20 token that you want the contract to support. With this configuration, any funds sent to the contract must be in this specific ERC20 token. 
+
+If you want to add creators during deployment, you can pass them in the third and fourth arguments like so:
+
+```typescript
+args: [deployer,ZERO_ADDRESS,arrayofcreators,caps]
+```
+
+Here, `arrayofcreators` is an array of addresses of the creators you want to add, and `caps` is an array of the corresponding cap amounts for each creator.
+
+In conclusion, you can adjust the `args` array to deploy the contract in various configurations. Whether you want it in ETH mode or ERC20 mode, or whether you want to add creators during deployment, depends on the arguments you pass.
