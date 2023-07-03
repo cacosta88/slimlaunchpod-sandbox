@@ -1,6 +1,6 @@
 
 <div align="center">
-  <img src="./rocket2logo.png" width="200" alt="Made with stable diffusion">
+  <img src="./rocket2logo.png" width="300" alt="Made with stable diffusion">
 </div>
 
 # Overview - Slim Launchpod (sandbox repo)
