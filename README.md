@@ -6,7 +6,7 @@ This contract’s constructor function does the following:
 
 The constructor function of this smart contract is used to initialize some important variables when the contract is deployed. Here's a breakdown of its purpose and functionality:
 
-```
+```solidity
     constructor(address _primaryAdmin,address _tokenAddress,address[] memory _creators,uint256[] memory _caps) {
         _setupRole(DEFAULT_ADMIN_ROLE, _primaryAdmin);
         primaryAdmin = _primaryAdmin;
