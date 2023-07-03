@@ -116,3 +116,29 @@ args: [deployer,ZERO_ADDRESS,arrayofcreators,caps]
 Here, `arrayofcreators` is an array of addresses of the creators you want to add, and `caps` is an array of the corresponding cap amounts for each creator.
 
 In conclusion, you can adjust the `args` array to deploy the contract in various configurations. Whether you want it in ETH mode or ERC20 mode, or whether you want to add creators during deployment, depends on the arguments you pass.
+
+# Testing
+
+Once you're in your Hardhat project directory, run the following command to execute your test files:
+
+```
+npx hardhat test
+```
+This command will compile your contracts if necessary and then execute all test files in the test folder.
+
+In your case, there are two test files – one for each mode (ETH or ERC20). The specific test file that runs depends on how the deploy file is set up.
+
+If your args array in the deploy file is set to ETH mode, i.e., the second argument is ZERO_ADDRESS:
+
+```typescript
+args: [deployer,ZERO_ADDRESS,[],[]]
+```
+then Hardhat will execute the test file for ETH mode.
+
+On the other hand, if your args array in the deploy file is set to ERC20 mode, i.e., the second argument is an ERC20 token address:
+
+```typescript
+args: [deployer,ERC20Mock1Address,[],[]]
+```
+then Hardhat will execute the test file for ERC20 mode.
+
