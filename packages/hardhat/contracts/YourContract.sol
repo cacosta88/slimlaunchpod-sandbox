@@ -1,78 +1,338 @@
-//SPDX-License-Identifier: MIT
-pragma solidity >=0.8.0 <0.9.0;
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.9;
 
-// Useful for debugging. Remove when deploying to a live network.
-import "hardhat/console.sol";
-// Use openzeppelin to inherit battle-tested implementations (ERC20, ERC721, etc)
-// import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-/**
- * A smart contract that allows changing a state variable of the contract and tracking the changes
- * It also allows the owner to withdraw the Ether in the contract
- * @author BuidlGuidl
- */
-contract YourContract {
+// Defining custom errors for better error handling
+error NoValueSent();
+error InsufficientFundsInContract(uint256 requested, uint256 available);
+error NoActiveFlowForCreator(address creator);
+error InsufficientInFlow(uint256 requested, uint256 available);
+error EtherSendingFailed(address recipient);
+error LengthsMismatch();
+error CapCannotBeZero();
+error InvalidCreatorAddress();
+error CreatorAlreadyExists();
+error ContractIsStopped();
+error MaxCreatorsReached();
+error AccessDenied();
+error InvalidTokenAddress();
+error NoFundsInContract();
+error ERC20TransferFailed();
+error ERC20SendingFailed(address token, address recipient);
+error ERC20FundsTransferFailed(address token, address to, uint256 amount);
 
-    // State Variables
-    address public immutable owner;
-    string public greeting = "Building Unstoppable Apps!!!";
-    bool public premium = false;
-    uint256 public totalCounter = 0;
-    mapping(address => uint) public userGreetingCounter;
+contract YourContract is AccessControl, ReentrancyGuard {
+    using SafeERC20 for IERC20;
 
-    // Events: a way to emit log statements from smart contract that can be listened to by external parties
-    event GreetingChange(address indexed greetingSetter, string newGreeting, bool premium, uint256 value);
+    // Fixed cycle and max creators
+    uint256 immutable CYCLE = 30 days;
+    uint256 immutable MAXCREATORS = 25;
 
-    // Constructor: Called once on contract deployment
-    // Check packages/hardhat/deploy/00_deploy_your_contract.ts
-    constructor(address _owner) {
-        owner = _owner;
-    }
+    // ERC20 support
+    bool public isERC20 = false; 
 
-    // Modifier: used to define a set of rules that must be met before or after a function is executed
-    // Check the withdraw() function
-    modifier isOwner() {
-        // msg.sender: predefined variable that represents address of the account that called the current function
-        require(msg.sender == owner, "Not the Owner");
+    // Token address for ERC20 support
+    address public tokenAddress;
+
+    // Emergency mode variable
+    bool public stopped = false;
+
+    // Primary admin for remaining balances
+    address private primaryAdmin;
+
+    // Modifier to check for admin permissions
+    modifier onlyAdmin() {
+        if (!hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) revert AccessDenied();
         _;
     }
 
-    /**
-     * Function that allows anyone to change the state variable "greeting" of the contract and increase the counters
-     *
-     * @param _newGreeting (string memory) - new greeting to save on the contract
-     */
-    function setGreeting(string memory _newGreeting) public payable {
-        // Print data to the hardhat chain console. Remove when deploying to a live network.
-        console.log("Setting new greeting '%s' from %s",  _newGreeting, msg.sender);
+    // Constructor to setup admin role and initial creators
+    constructor(address _primaryAdmin,address _tokenAddress,address[] memory _creators,uint256[] memory _caps) {
+        _setupRole(DEFAULT_ADMIN_ROLE, _primaryAdmin);
+        primaryAdmin = _primaryAdmin;
 
-        // Change state variables
-        greeting = _newGreeting;
-        totalCounter += 1;
-        userGreetingCounter[msg.sender] += 1;
-
-        // msg.value: built-in global variable that represents the amount of ether sent with the transaction
-        if (msg.value > 0) {
-            premium = true;
-        } else {
-            premium = false;
+        if (_tokenAddress != address(0)) {
+            isERC20 = true;
+            tokenAddress = _tokenAddress;
         }
 
-        // emit: keyword used to trigger an event
-        emit GreetingChange(msg.sender, _newGreeting, msg.value > 0, 0);
+        if (_creators.length > 0) {
+            addBatch(_creators, _caps);
+        }
     }
 
-    /**
-     * Function that allows the owner to withdraw all the Ether in the contract
-     * The function can only be called by the owner of the contract as defined by the isOwner modifier
-     */
-    function withdraw() isOwner public {
-        (bool success,) = owner.call{value: address(this).balance}("");
-        require(success, "Failed to send Ether");
+    // Function to modify admin roles
+    function modifyAdminRole(
+        address adminAddress,
+        bool shouldGrant
+    ) public onlyAdmin {
+        if (shouldGrant) {
+            grantRole(DEFAULT_ADMIN_ROLE, adminAddress);
+        } else {
+            revokeRole(DEFAULT_ADMIN_ROLE, adminAddress);
+        }
     }
 
-    /**
-     * Function that allows the contract to receive ETH
-     */
+    // Struct to store information about creator's flow
+    struct CreatorFlowInfo {
+        uint256 cap; // Maximum amount of funds that can be withdrawn in a cycle (in wei)
+        uint256 last; // The timestamp of the last withdrawal
+    }
+
+
+    // Mapping to store the flow info of each creator
+    mapping(address => CreatorFlowInfo) public flowingCreators;
+    // Mapping to store the index of each creator in the activeCreators array
+    mapping(address => uint256) public creatorIndex;
+    // Array to store the addresses of all active creators
+    address[] public activeCreators;
+
+
+    // Declare events to log various activities
+    event FundsReceived(address indexed from, uint256 amount);
+    event Withdrawn(address indexed to, uint256 amount, string reason);
+    event CreatorAdded(address indexed to, uint256 amount, uint256 cycle);
+    event CreatorUpdated(address indexed to, uint256 amount, uint256 cycle);
+    event CreatorRemoved(address indexed to);
+    event AgreementDrained(address indexed to, uint256 amount);
+    event ERC20FundsReceived(address indexed token,address indexed from,uint256 amount);
+
+    // Check if a flow for a creator is active
+    modifier isFlowActive(address _creator) {
+        if (flowingCreators[_creator].cap == 0)
+            revert NoActiveFlowForCreator(_creator);
+        _;
+    }
+
+    // Check if the contract is stopped
+    modifier stopInEmergency() {
+        if (stopped) revert ContractIsStopped();
+        _;
+    }
+
+    //Fund contract
+    function fundContract(uint256 _amount) public payable {
+    //if erc20 not true, then do the following
+
+        if (!isERC20) {
+
+            if (msg.value == 0) revert NoValueSent();
+            emit FundsReceived(msg.sender, msg.value);}
+
+        else {
+            if (_amount == 0) revert NoValueSent();
+            uint256 currentBalance = IERC20(tokenAddress).balanceOf(address(this));
+            IERC20(tokenAddress).safeTransferFrom(msg.sender, address(this), _amount);
+            uint256 newBalance = IERC20(tokenAddress).balanceOf(address(this));
+            if (newBalance == currentBalance) revert ERC20TransferFailed();
+            emit ERC20FundsReceived(tokenAddress, msg.sender, _amount);
+        }
+    } 
+
+    // Enable or disable emergency mode
+    function emergencyMode(bool _enable) public onlyAdmin {
+        stopped = _enable;
+    }
+
+    // Get all creators' data.
+    function allCreatorsData(
+        address[] calldata _creators
+    ) public view returns (CreatorFlowInfo[] memory) {
+        uint256 creatorLength = _creators.length;
+        CreatorFlowInfo[] memory result = new CreatorFlowInfo[](creatorLength);
+        for (uint256 i = 0; i < creatorLength; ++i) {
+            address creatorAddress = _creators[i];
+            result[i] = flowingCreators[creatorAddress];
+        }
+        return result;
+    }
+
+
+
+    // Get the available amount for a creator.
+    function availableCreatorAmount(
+        address _creator
+    ) public view isFlowActive(_creator) returns (uint256) {
+        CreatorFlowInfo memory creatorFlow = flowingCreators[_creator];
+        uint256 timePassed = block.timestamp - creatorFlow.last;
+        uint256 cycleDuration = CYCLE;
+
+        if (timePassed < cycleDuration) {
+            uint256 availableAmount = (timePassed * creatorFlow.cap) /
+                cycleDuration;
+            return availableAmount;
+        } else {
+            return creatorFlow.cap;
+        }
+    }
+
+    
+    // Add a new creator's flow. No more than 25 creators are allowed.
+    function addCreatorFlow(
+        address payable _creator,
+        uint256 _cap
+    ) public onlyAdmin {
+        // Check for maximum creators.
+        if (activeCreators.length >= MAXCREATORS) revert MaxCreatorsReached();
+
+        validateCreatorInput(_creator, _cap);
+        flowingCreators[_creator] = CreatorFlowInfo(_cap, block.timestamp);
+        activeCreators.push(_creator);
+        creatorIndex[_creator] = activeCreators.length - 1;
+        emit CreatorAdded(_creator, _cap, CYCLE);
+    }
+
+    // Add a batch of creators.
+    function addBatch(
+        address[] memory _creators,
+        uint256[] memory _caps
+    ) public onlyAdmin {
+        uint256 cLength = _creators.length;
+        if (cLength != _caps.length) revert LengthsMismatch();
+        for (uint256 i = 0; i < cLength; ) {
+            addCreatorFlow(payable(_creators[i]), _caps[i]);
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+
+    // Validate the input for a creator
+    function validateCreatorInput(
+        address payable _creator,
+        uint256 _cap
+    ) internal view {
+        if (_creator == address(0)) revert InvalidCreatorAddress();
+        if (_cap == 0) revert CapCannotBeZero();
+        if (flowingCreators[_creator].cap > 0) revert CreatorAlreadyExists();
+    }
+
+    // Update a creator's flow cap and cycle.
+    function updateCreatorFlowCapCycle(
+        address payable _creator,
+        uint256 _newCap
+    ) public onlyAdmin isFlowActive(_creator) {
+        if (_newCap == 0) revert CapCannotBeZero();
+
+        CreatorFlowInfo storage creatorFlow = flowingCreators[_creator];
+
+        creatorFlow.cap = _newCap;
+
+        uint256 timestamp = block.timestamp;
+        uint256 timePassed = timestamp - creatorFlow.last;
+
+        if (CYCLE < timePassed) {
+            creatorFlow.last = timestamp - (CYCLE);
+        }
+
+        emit CreatorUpdated(_creator, _newCap, CYCLE);
+    }
+
+
+    // Remove a creator's flow
+    function removeCreatorFlow(
+        address _creator
+    ) public onlyAdmin isFlowActive(_creator) {
+        uint256 creatorIndexToRemove = creatorIndex[_creator];
+        address lastCreator = activeCreators[activeCreators.length - 1];
+
+        if (_creator != lastCreator) {
+            activeCreators[creatorIndexToRemove] = lastCreator;
+            creatorIndex[lastCreator] = creatorIndexToRemove;
+        }
+
+        activeCreators.pop();
+
+        delete flowingCreators[_creator];
+        delete creatorIndex[_creator];
+
+        emit CreatorRemoved(_creator);
+    }
+
+
+    function flowWithdraw(
+        uint256 _amount,
+        string memory _reason
+    ) public isFlowActive(msg.sender) nonReentrant stopInEmergency {
+        CreatorFlowInfo storage creatorFlow = flowingCreators[msg.sender];
+
+        uint256 totalAmountCanWithdraw = availableCreatorAmount(msg.sender);
+        if (totalAmountCanWithdraw < _amount)
+            revert InsufficientInFlow(_amount, totalAmountCanWithdraw);
+
+        uint256 creatorflowLast = creatorFlow.last;
+        uint256 timestamp = block.timestamp;
+        uint256 cappedLast = timestamp - CYCLE;
+        if (creatorflowLast < cappedLast) {
+            creatorflowLast = cappedLast;
+        }
+        if (!isERC20) {
+            uint256 contractFunds = address(this).balance;
+            if (contractFunds < _amount)
+                revert InsufficientFundsInContract(_amount, contractFunds);
+
+            (bool sent, ) = msg.sender.call{value: _amount}(""); 
+            if (!sent) revert EtherSendingFailed(msg.sender);}
+        else { 
+            uint256 contractFunds = IERC20(tokenAddress).balanceOf(address(this));
+            if (contractFunds < _amount)
+                revert InsufficientFundsInContract(_amount, contractFunds);
+
+            IERC20(tokenAddress).safeTransfer(msg.sender, _amount);
+
+            uint256 newBalance = IERC20(tokenAddress).balanceOf(address(this));
+            if (newBalance != contractFunds - _amount)
+                revert ERC20FundsTransferFailed(tokenAddress, msg.sender, _amount);
+            
+        }
+
+        creatorFlow.last =
+            creatorflowLast +
+            (((timestamp - creatorflowLast) * _amount) /
+                totalAmountCanWithdraw);
+
+        emit Withdrawn(msg.sender, _amount, _reason);
+    }
+
+
+    // Drain the agreement to the current primary admin
+    function drainAgreement(address _token) public onlyAdmin nonReentrant {
+        address _tokenAddress;
+        if (!isERC20) {
+            uint256 remainingBalance = address(this).balance;
+            if (remainingBalance == 0) revert NoFundsInContract();
+
+            (bool sent, ) = primaryAdmin.call{value: remainingBalance}(""); 
+            if (!sent) revert EtherSendingFailed(primaryAdmin);
+
+            emit AgreementDrained(primaryAdmin, remainingBalance);}
+        else {
+
+            if (_token != address(0)) {
+                _tokenAddress = _token;}
+                else {
+                    _tokenAddress = tokenAddress;
+                }
+
+            uint256 remainingBalance = IERC20(_tokenAddress).balanceOf(address(this));
+            if (remainingBalance == 0) revert NoFundsInContract();
+
+            IERC20(_tokenAddress).safeTransfer(primaryAdmin, remainingBalance);
+
+            uint256 newBalance = IERC20(_tokenAddress).balanceOf(address(this));
+            if (newBalance != 0)
+                revert ERC20FundsTransferFailed(_tokenAddress, primaryAdmin, remainingBalance);
+
+            emit AgreementDrained(primaryAdmin, remainingBalance);
+        }
+    }
+
+
+    // Fallback function to receive ether
     receive() external payable {}
 }
