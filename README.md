@@ -135,10 +135,13 @@ args: [deployer,ZERO_ADDRESS,[],[]]
 ```
 then Hardhat will execute the test file for ETH mode.
 
+![Optional Alt Text](./ethmodetest.png)
+
 On the other hand, if your args array in the deploy file is set to ERC20 mode, i.e., the second argument is an ERC20 token address:
 
 ```typescript
 args: [deployer,ERC20Mock1Address,[],[]]
 ```
 then Hardhat will execute the test file for ERC20 mode.
+![Optional Alt Text](./erc20modetest.png)
 
