@@ -32,7 +32,7 @@ Three key parameters: address _primaryAdmin, address _tokenAddress, and the pair
 
 3. `address[] memory _creators, uint256[] memory _caps` parameters are arrays that contain the addresses of the initial set of creators and their respective caps (maximum amounts of funds that can be withdrawn in a cycle). The `addBatch(_creators, _caps)` function call is used to batch add creators to the contract if the `_creators` array length is more than zero. This function adds each creator and their respective cap to the contract, assuming that the number of creators does not exceed the maximum allowed and the lengths of `_creators` and `_caps` are equal.
 
-Key functions and their explanations:
+***Key functions and their explanations:***
 
 1. `fundContract(uint256 _amount)` function:
 
