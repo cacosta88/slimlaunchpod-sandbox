@@ -131,7 +131,7 @@ npx hardhat test
 ```
 This command will compile your contracts if necessary and then execute all test files in the test folder.
 
-In your case, there are two test files – one for each mode (ETH or ERC20). The specific test file that runs depends on how the deploy file is set up.
+In this case, there are two test files – one for each mode (ETH or ERC20). The specific test file that runs depends on how the deploy file is set up.
 
 If your args array in the deploy file is set to ETH mode, i.e., the second argument is ZERO_ADDRESS:
 
