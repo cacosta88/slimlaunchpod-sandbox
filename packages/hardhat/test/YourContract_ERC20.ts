@@ -16,7 +16,7 @@ const CYCLE = 30 * 24 * 60 * 60;
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const CAP = ethers.utils.parseEther("0.5");
-const ERC20CAP = 50;
+const ERC20CAP = 5;
 const halfERC20CAP = ethers.BigNumber.from(5);
 const CAP_UPDATE = ethers.utils.parseEther("0.6");
 
@@ -188,8 +188,8 @@ mock_1 = await ethers.getContract("ERC20Mock1");
         
       
         //add user 1 as creator
-        console.log(`      Admin adds user_1 as creator with a cap of 100`);
-        await contract.connect(admin).addCreatorFlow(user_1.address, 100);
+        console.log(`      Admin adds user_1 as creator with a cap of 10`);
+        await contract.connect(admin).addCreatorFlow(user_1.address, 10);
 
 
         //trigger allCreatorsData with user_1 inside an array
@@ -253,8 +253,12 @@ mock_1 = await ethers.getContract("ERC20Mock1");
         expect(await contract.stopped()).to.be.false;
 
         //user_1 withdraws its available balance
+        //get available balance for user_1
+        const availableCreator1Balance2 = await contract.connect(admin).availableCreatorAmount(user_1.address);
+        console.log(`      Available balance for user_1 is ${availableCreator1Balance2}`);
+
         console.log(`      user_1 withdraws its available balance`);
-        await contract.connect(user_1).flowWithdraw(availableCreator1Balance, "For testing");
+        await contract.connect(user_1).flowWithdraw(availableCreator1Balance2, "For testing");
         const balanceAfterWithdraw2 = await mock_1.balanceOf(contract.address);
         console.log(`      Balance of contract is ${balanceAfterWithdraw2} after user_1 withdraws`);
         console.log(`      Balance of user_1 is ${await mock_1.balanceOf(user_1.address)} after user_1 withdraws`);
@@ -309,7 +313,7 @@ mock_1 = await ethers.getContract("ERC20Mock1");
 
 
         //user_2, as admin, batch adds user_3, user_4 and user_5 as creators with caps 30, 40 and 50
-        console.log(`      user_2, as admin, batch adds user_3, user_4 and user_5 as creators with caps 30, 40 and 50`);
+        console.log(`      user_2, as admin, batch adds user_3, user_4 and user_5 as creators with caps 3, 4 and 5`);
         await contract.connect(admin).addBatch([user_3.address, user_4.address, user_5.address], [30, 40, 50]);
 
         //allcreatorsdata for user_3, user_4 and user_5
@@ -332,9 +336,9 @@ mock_1 = await ethers.getContract("ERC20Mock1");
         console.log(`      The available balance for user_4 is now ${await contract.connect(admin).availableCreatorAmount(user_4.address)}`);
         console.log(`      The available balance for user_5 is now ${await contract.connect(admin).availableCreatorAmount(user_5.address)}`);
 
-        //update the cap of user_3 to 60
-        console.log(`      Admin updates the cap of user_3 to 60`);
-        await contract.connect(admin).updateCreatorFlowCapCycle(user_3.address, 60);
+        //update the cap of user_3 to 10
+        console.log(`      Admin updates the cap of user_3 to 10`);
+        await contract.connect(admin).updateCreatorFlowCapCycle(user_3.address, 10);
 
         //user_3 allCreatorsData
         const allcreatordataoutput5 =  await contract.connect(admin).allCreatorsData([user_3.address]);
