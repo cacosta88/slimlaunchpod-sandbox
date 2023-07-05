@@ -149,24 +149,37 @@ it("Ether mode life-cycle", async () => {
           contract,
           "MaxCreatorsReached",
         )
-
-        //simulate the passage of time of 15 days
-        await ethers.provider.send("evm_increaseTime", [15 * 24 * 60 * 60]);
-        await ethers.provider.send("evm_mine", []);
-
-        //check availableamount of user_10
+        //available amount of user 10
         const user_10_availableAmount = await contract.availableCreatorAmount(user_10.address);
         console.log("      User 10 available amount: ", ethers.utils.formatEther(user_10_availableAmount));
 
         //user 10 withdraws his available amount via flowWithdraw function that takes amount and reason as parameters
-        await expect(contract.connect(user_10).flowWithdraw(user_10_availableAmount, "testing"))
-        .to.emit(contract, "Withdrawn") 
-        .withArgs(user_10.address, user_10_availableAmount, "testing");
+        await expect(contract.connect(user_10).flowWithdraw(user_10_availableAmount, "testing")).to.emit(contract, "Withdrawn").withArgs(user_10.address, user_10_availableAmount, "testing");
         console.log("      User 10 withdraws his available amount of: ", ethers.utils.formatEther(user_10_availableAmount));
 
-        //check availableamount of user_10
+        //user 10 available amount after withdrawal
         const user_10_availableAmount_after = await contract.availableCreatorAmount(user_10.address);
         console.log("      User 10 available amount after withdrawal: ", ethers.utils.formatEther(user_10_availableAmount_after));
+
+
+        //simulate the passage of time of 15 days
+        await ethers.provider.send("evm_increaseTime", [15 * 24 * 60 * 60]);
+        await ethers.provider.send("evm_mine", []);
+        console.log("      Simulating the passage of time of 15 days");
+
+        //check availableamount of user_10
+        const user_10_availableAmountcheck = await contract.availableCreatorAmount(user_10.address);
+        console.log("      User 10 available amount: ", ethers.utils.formatEther(user_10_availableAmountcheck));
+
+        //user 10 withdraws his available amount via flowWithdraw function that takes amount and reason as parameters
+        await expect(contract.connect(user_10).flowWithdraw(user_10_availableAmountcheck, "testing"))
+        .to.emit(contract, "Withdrawn") 
+        .withArgs(user_10.address, user_10_availableAmountcheck, "testing");
+        console.log("      User 10 withdraws his available amount of: ", ethers.utils.formatEther(user_10_availableAmountcheck));
+
+        //check availableamount of user_10
+        const user_10_availableAmount_after2 = await contract.availableCreatorAmount(user_10.address);
+        console.log("      User 10 available amount after withdrawal: ", ethers.utils.formatEther(user_10_availableAmount_after2));
 
         //check contract balance
         const contract_balance = await provider.getBalance(contract.address);
@@ -175,6 +188,7 @@ it("Ether mode life-cycle", async () => {
         //simulate the passage of time of 15 days
         await ethers.provider.send("evm_increaseTime", [15 * 24 * 60 * 60]);
         await ethers.provider.send("evm_mine", []);
+        console.log("      Simulating the passage of time of 15 days");
 
         //check availableamount of user_10
         const user_10_availableAmount_2 = await contract.availableCreatorAmount(user_10.address);
