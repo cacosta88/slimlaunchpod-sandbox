@@ -71,20 +71,20 @@ Here's how it works:
 
 ```solidity
 function availableCreatorAmount(
-    address _creator
-) public view isFlowActive(_creator) returns (uint256) {
-    CreatorFlowInfo memory creatorFlow = flowingCreators[_creator];
-    uint256 timePassed = block.timestamp - creatorFlow.last;
-    uint256 cycleDuration = CYCLE;
+        address _creator
+    ) public view isFlowActive(_creator) returns (uint256) {
+        CreatorFlowInfo memory creatorFlow = flowingCreators[_creator];
+        uint256 timePassed = block.timestamp - creatorFlow.last;
 
-    if (timePassed < cycleDuration) {
-        uint256 availableAmount = (timePassed * creatorFlow.cap) /
-            cycleDuration;
-        return availableAmount;
-    } else {
-        return creatorFlow.cap;
+
+        if (timePassed < CYCLE) {
+            uint256 availableAmount = (timePassed * creatorFlow.cap) /
+                CYCLE;
+            return availableAmount;
+        } else {
+            return creatorFlow.cap;
+        }
     }
-}
 ```
 
 Each 'creator flow' includes a 'cap' (the maximum amount of funds that can be withdrawn in a cycle) and a 'last' (the timestamp of the last withdrawal). The 'availableCreatorAmount' function first retrieves the creator flow for the given creator address, then calculates how much time has passed since the last withdrawal. If less time has passed than the length of a full cycle, the function calculates the amount the creator can withdraw proportionally. If a full cycle or more has passed, the creator can withdraw the full cap amount.
