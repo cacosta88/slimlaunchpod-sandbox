@@ -159,11 +159,11 @@ contract YourContract is AccessControl, ReentrancyGuard {
     ) public view isFlowActive(_creator) returns (uint256) {
         CreatorFlowInfo memory creatorFlow = flowingCreators[_creator];
         uint256 timePassed = block.timestamp - creatorFlow.last;
-        uint256 cycleDuration = CYCLE;
 
-        if (timePassed < cycleDuration) {
+
+        if (timePassed < CYCLE) {
             uint256 availableAmount = (timePassed * creatorFlow.cap) /
-                cycleDuration;
+                CYCLE;
             return availableAmount;
         } else {
             return creatorFlow.cap;
