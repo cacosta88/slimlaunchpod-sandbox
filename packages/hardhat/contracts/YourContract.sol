@@ -180,7 +180,7 @@ contract YourContract is AccessControl, ReentrancyGuard {
         if (activeCreators.length >= MAXCREATORS) revert MaxCreatorsReached();
 
         validateCreatorInput(_creator, _cap);
-        flowingCreators[_creator] = CreatorFlowInfo(_cap, block.timestamp);
+        flowingCreators[_creator] = CreatorFlowInfo(_cap, block.timestamp - CYCLE);
         activeCreators.push(_creator);
         creatorIndex[_creator] = activeCreators.length - 1;
         emit CreatorAdded(_creator, _cap, CYCLE);
